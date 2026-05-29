@@ -25,13 +25,27 @@ OVERLAP = 0.5
 
 def predict(features_dir, out_path):
 
-    transforms = Compose([
-        LoadImaged(keys=["nacpet"]),
-        EnsureChannelFirstd(keys=["nacpet"]),
-        NormalizeIntensityd(keys=["nacpet"], nonzero=False, subtrahend=[0], channel_wise=True),
-        ConcatItemsd(keys=["nacpet"], name="input"),
-        EnsureTyped(keys=["input"]),
-    ])
+    transforms = Compose(
+        [
+            LoadImaged(
+                keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"]
+            ),
+            EnsureChannelFirstd(
+                keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"]
+            ),
+            NormalizeIntensityd(
+                keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"],
+                nonzero=True,
+                channel_wise=True,
+                subtrahend=[0],
+            ),
+            ConcatItemsd(
+                keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"],
+                name="input",
+            ),
+            EnsureTyped(keys=["input"]),
+        ]
+    )
 
     device = "cuda"
 

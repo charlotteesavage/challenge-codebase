@@ -1,0 +1,12 @@
+data_dir: /home/csavage/challenge/bic-mac-data #CHANGE to your dataset path
+num_workers: 0
+output_dir: outputs/smoke_test
+
+epochs: 10
+learning_rate: 0.0003
+batch_size: 1
+
+# patch_size: [192,192,192]
+patch_size: [128,128,128] # reduced patch size for quicker training
+train_num_samples: 2 #Number of patches to sample per train subject
+val_num_samples: 2 #Number of patches to sample per val subject

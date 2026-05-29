@@ -5,6 +5,7 @@ CLAUDE.md
 outputs*/
 docs_scripts/
 *.nii.gz
+data/
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python
 

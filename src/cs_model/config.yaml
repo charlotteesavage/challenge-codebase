@@ -1,13 +1,11 @@
-data_dir: /data/bic-mac-data/train #CHANGE to your dataset path
-dara_dir: /home/
-num_workers: 2
-output_dir: outputs
+data_dir: /SAN/medic/BIC-MAC-CS/bic-mac-data/train #CHANGE to your dataset path
+num_workers: 1
+output_dir: outputs/full_run
 
-epochs: 250
+epochs:250 
 learning_rate: 0.0003
 batch_size: 1
 
-# patch_size: [192,192,192]
-patch_size: [128,128,128] # reduced patch size for quicker training
+patch_size: [192,192,192]
 train_num_samples: 2 #Number of patches to sample per train subject
 val_num_samples: 8 #Number of patches to sample per val subject

@@ -47,7 +47,8 @@ def main():
         shuffle=True,
         num_workers=cfg["num_workers"],
         pin_memory=True,
-        persistent_workers=True
+        # persistent_workers=True
+	persistent_workers=cfg['num_workers']>0,
     )
 
     print("Caching val dataset...")
@@ -63,7 +64,8 @@ def main():
         shuffle=False,
         num_workers=cfg["num_workers"],
         pin_memory=True,
-        persistent_workers=True
+        # persistent_workers=True,
+	persistent_workers=cfg['num_workers']>0
     )
     
     model = build_model().to(device)
