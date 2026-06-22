@@ -2,12 +2,14 @@ import os
 import torch
 import yaml
 import matplotlib.pyplot as plt
-from monai.data import DataLoader, CacheDataset
+from monai.data import DataLoader, PersistentDataset
 from tqdm import tqdm
 
 from dataset import get_dataset
 from transforms import get_transforms
 from unet import build_model
+
+import datetime as dt
 
 
 torch.backends.cudnn.benchmark = True
@@ -34,12 +36,11 @@ def main():
     train_transforms = get_transforms(cfg["patch_size"], cfg["train_num_samples"])
     val_transforms = get_transforms(cfg["patch_size"], cfg["val_num_samples"])
 
-    print("Caching train dataset...")
-    train_dataset = CacheDataset(
+    print("Loading train dataset...")
+    train_dataset = PersistentDataset(
         data=train_data,
         transform=train_transforms,
-        cache_rate=1.0, # Change this to reduce memory footprint
-        num_workers=cfg["num_workers"],
+        cache_dir=cfg["cache_dir"],
     )
     loader = DataLoader(
         train_dataset,
@@ -47,15 +48,14 @@ def main():
         shuffle=True,
         num_workers=cfg["num_workers"],
         pin_memory=True,
-        persistent_workers=True
+        persistent_workers=cfg["num_workers"] > 0,
     )
 
-    print("Caching val dataset...")
-    val_dataset = CacheDataset(
+    print("Loading val dataset...")
+    val_dataset = PersistentDataset(
         data=val_data,
         transform=val_transforms,
-        cache_rate=1.0,
-        num_workers=cfg["num_workers"],
+        cache_dir=cfg["cache_dir"],
     )
     val_loader = DataLoader(
         val_dataset,
@@ -63,7 +63,7 @@ def main():
         shuffle=False,
         num_workers=cfg["num_workers"],
         pin_memory=True,
-        persistent_workers=True
+        persistent_workers=cfg["num_workers"] > 0,
     )
     
     model = build_model().to(device)
@@ -83,9 +83,14 @@ def main():
     l1_loss = torch.nn.L1Loss()
 
     out = cfg["output_dir"]
-    os.makedirs(f"{out}/checkpoints", exist_ok=True)
-    os.makedirs(f"{out}/logs", exist_ok=True)
-    os.makedirs(f"{out}/plots", exist_ok=True)
+
+    checkpoints_out = f"{out}/checkpoints/{dt.datetime.now().strftime('%Y-%m-%d')}"
+    logs_out = f"{out}/logs/{dt.datetime.now().strftime('%Y-%m-%d')}"
+    plots_out = f"{out}/plots/{dt.datetime.now().strftime('%Y-%m-%d')}"
+
+    os.makedirs(f"{checkpoints_out}", exist_ok=True)
+    os.makedirs(f"{logs_out}", exist_ok=True)
+    os.makedirs(f"{plots_out}", exist_ok=True)
 
     best_val_loss = float("inf")
 
@@ -98,7 +103,7 @@ def main():
 
         model.train()
 
-        epoch_loss = 0
+        epoch_loss = torch.zeros(1, device=device)
 
         pbar = tqdm(loader)
 
@@ -107,7 +112,7 @@ def main():
             x    = batch["input"].to(device)
             y    = batch["ct"].to(device)
             mask = batch["prediction_mask"].bool().to(device)
-            y[~mask] = 0 # don't bother trying to predict the bed 
+            y[~mask] = 0  # don't bother trying to predict the bed
             optimizer.zero_grad()
 
             with torch.amp.autocast("cuda"):
@@ -120,29 +125,29 @@ def main():
             scaler.step(optimizer)
             scaler.update()
 
-            epoch_loss += loss.item()
+            epoch_loss += loss.detach()
 
             pbar.set_description(f"loss {loss.item():.4f}")
 
-        avg_train_loss = epoch_loss / len(loader)
+        avg_train_loss = epoch_loss.item() / len(loader)
 
         scheduler.step()
 
         # validation
         model.eval()
-        val_loss = 0
+        val_loss = torch.zeros(1, device=device)
         with torch.no_grad():
             for batch in val_loader:
                 x    = batch["input"].to(device)
                 y    = batch["ct"].to(device)
                 mask = batch["prediction_mask"].bool().to(device)
-                y[~mask] = 0 # don't bother trying to predict the bed 
+                y[~mask] = 0  # don't bother trying to predict the bed
 
                 with torch.amp.autocast("cuda"):
                     pred = model(x)
                     loss = l1_loss(pred, y)
-                val_loss += loss.item()
-        avg_val_loss = val_loss / len(val_loader)
+                val_loss += loss.detach()
+        avg_val_loss = val_loss.item() / len(val_loader)
 
         print(f"Epoch {epoch}  train={avg_train_loss:.4f}  val={avg_val_loss:.4f}")
 
@@ -154,31 +159,29 @@ def main():
 
             best_val_loss = avg_val_loss
 
-            torch.save(
-                model.state_dict(),
-                f"{out}/checkpoints/best_model.pth"
-            )
+            torch.save(model.state_dict(), f"{checkpoints_out}/best_model.pth")
 
-        # last checkpoint
-        torch.save(
-            model.state_dict(),
-            f"{out}/checkpoints/last_model.pth"
-        )
+        # last checkpoint (every 10 epochs)
+        if epoch % 10 == 0:
+            torch.save(model.state_dict(), f"{checkpoints_out}/last_model.pth")
 
         # log
-        with open(f"{out}/logs/train_log.txt", "a") as f:
+        with open(
+            f"{logs_out}/{dt.datetime.now().strftime('%H-%M-%S')}_train_log.txt", "a"
+        ) as f:
             f.write(f"{epoch},{avg_train_loss},{avg_val_loss}\n")
 
-        # plot loss
-        plt.figure()
-        plt.plot(train_loss_history, label="train")
-        plt.plot(val_loss_history, label="val")
-        plt.xlabel("Epoch")
-        plt.ylabel("Loss")
-        plt.title("Train / Val Loss")
-        plt.legend()
-        plt.savefig(f"{out}/plots/loss_curve.png")
-        plt.close()
+        # plot loss (every 10 epochs)
+        if epoch % 10 == 0:
+            plt.figure()
+            plt.plot(train_loss_history, label="train")
+            plt.plot(val_loss_history, label="val")
+            plt.xlabel("Epoch")
+            plt.ylabel("Loss")
+            plt.title("Train / Val Loss")
+            plt.legend()
+            plt.savefig(f"{plots_out}/loss_curve.png")
+            plt.close()
 
 
 if __name__ == "__main__":
