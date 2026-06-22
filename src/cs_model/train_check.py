@@ -15,7 +15,7 @@ torch.backends.cudnn.benchmark = True
 
 
 def load_config():
-    with open("config.yaml") as f:
+    with open("config_test.yaml") as f:
         return yaml.safe_load(f)
 
 
@@ -48,7 +48,7 @@ def main():
         num_workers=cfg["num_workers"],
         pin_memory=True,
         # persistent_workers=True
-	persistent_workers=cfg['num_workers']>0,
+        persistent_workers=cfg["num_workers"] > 0,
     )
 
     print("Caching val dataset...")
@@ -65,7 +65,7 @@ def main():
         num_workers=cfg["num_workers"],
         pin_memory=True,
         # persistent_workers=True,
-	persistent_workers=cfg['num_workers']>0
+        persistent_workers=cfg["num_workers"] > 0,
     )
     
     model = build_model().to(device)
@@ -109,7 +109,7 @@ def main():
             x    = batch["input"].to(device)
             y    = batch["ct"].to(device)
             mask = batch["prediction_mask"].bool().to(device)
-            y[~mask] = 0 # don't bother trying to predict the bed 
+            y[~mask] = 0  # don't bother trying to predict the bed
             optimizer.zero_grad()
 
             with torch.amp.autocast("cuda"):
@@ -138,7 +138,7 @@ def main():
                 x    = batch["input"].to(device)
                 y    = batch["ct"].to(device)
                 mask = batch["prediction_mask"].bool().to(device)
-                y[~mask] = 0 # don't bother trying to predict the bed 
+                y[~mask] = 0  # don't bother trying to predict the bed
 
                 with torch.amp.autocast("cuda"):
                     pred = model(x)
