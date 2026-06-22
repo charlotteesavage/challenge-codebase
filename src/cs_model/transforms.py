@@ -42,11 +42,11 @@ def get_transforms(patch_size, num_samples=2):
                 b_max=1.0,
                 clip=True,
             ),
-            # now input is just nacpet
             ConcatItemsd(
                 keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"],
                 name="input",
             ),
+            DeleteItemsd(keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"]),
             # Crop first so all random augmentations run on small patches
             RandSpatialCropSamplesd(
                 keys=["input", "ct", "prediction_mask"],
@@ -54,7 +54,7 @@ def get_transforms(patch_size, num_samples=2):
                 random_size=False,
                 num_samples=num_samples,
             ),
-            EnsureTyped(keys=["input", "ct", "prediction_mask"]),
+            EnsureTyped(keys=["input", "ct", "prediction_mask"], track_meta=False),
         ]
     )
 
