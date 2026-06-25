@@ -1,4 +1,5 @@
 import os
+import random
 import torch
 import yaml
 import matplotlib.pyplot as plt
@@ -21,16 +22,25 @@ def load_config():
         return yaml.safe_load(f)
 
 
+def select_device():
+    if not torch.cuda.is_available():
+        return "cpu"
+    free_by_idx = [
+        torch.cuda.mem_get_info(i)[0] for i in range(torch.cuda.device_count())
+    ]
+    return f"cuda:{max(range(len(free_by_idx)), key=free_by_idx.__getitem__)}"
+
 
 def main():
 
     cfg = load_config()
 
-    device = "cuda" if torch.cuda.is_available() else "cpu"
+    device = select_device()
 
     print("Using device:", device)
 
     all_data = get_dataset(cfg["data_dir"])
+    random.Random(cfg["seed"]).shuffle(all_data)
     val_data, train_data = all_data[:2], all_data[2:]
 
     train_transforms = get_transforms(cfg["patch_size"], cfg["train_num_samples"])
@@ -84,22 +94,56 @@ def main():
 
     out = cfg["output_dir"]
 
-    checkpoints_out = f"{out}/checkpoints/{dt.datetime.now().strftime('%Y-%m-%d')}"
-    logs_out = f"{out}/logs/{dt.datetime.now().strftime('%Y-%m-%d')}"
-    plots_out = f"{out}/plots/{dt.datetime.now().strftime('%Y-%m-%d')}"
+    # not date-stamped so a resumed run (e.g. after an SGE walltime kill) can find its checkpoint
+    checkpoints_out = f"{out}/checkpoints"
+    os.makedirs(checkpoints_out, exist_ok=True)
+    last_checkpoint_path = f"{checkpoints_out}/last_checkpoint.pth"
 
-    os.makedirs(f"{checkpoints_out}", exist_ok=True)
-    os.makedirs(f"{logs_out}", exist_ok=True)
-    os.makedirs(f"{plots_out}", exist_ok=True)
-
+    start_epoch = 0
     best_val_loss = float("inf")
 
     train_loss_history = []
     val_loss_history = []
 
+    run_date = dt.datetime.now().strftime("%Y-%m-%d")
+    run_starttime = dt.datetime.now().strftime("%H-%M-%S")
+
+    if os.path.exists(last_checkpoint_path):
+        print(f"Resuming from {last_checkpoint_path}")
+        checkpoint = torch.load(last_checkpoint_path, map_location=device)
+
+        changed = {
+            k: (checkpoint["cfg"].get(k), cfg[k])
+            for k in cfg
+            if checkpoint["cfg"].get(k) != cfg[k]
+        }
+        if changed:
+            print(
+                f"WARNING: resuming with a different config than the checkpoint was saved with: {changed}"
+            )
+
+        model.load_state_dict(checkpoint["model"])
+        optimizer.load_state_dict(checkpoint["optimizer"])
+        scheduler.load_state_dict(checkpoint["scheduler"])
+        scaler.load_state_dict(checkpoint["scaler"])
+        start_epoch = checkpoint["epoch"] + 1
+        best_val_loss = checkpoint["best_val_loss"]
+        train_loss_history = checkpoint["train_loss_history"]
+        val_loss_history = checkpoint["val_loss_history"]
+        run_date = checkpoint["run_date"]
+        run_starttime = checkpoint["run_starttime"]
+
+    logs_out = f"{out}/logs/{run_date}/{run_starttime}"
+    plots_out = f"{out}/plots/{run_date}"
+    os.makedirs(logs_out, exist_ok=True)
+    os.makedirs(plots_out, exist_ok=True)
+
+    log_path = f"{logs_out}/log.txt"
+    plot_path = f"{plots_out}/{run_starttime}_plot.png"
+
     print("Starting training...")
 
-    for epoch in range(cfg["epochs"]):
+    for epoch in range(start_epoch, cfg["epochs"]):
 
         model.train()
 
@@ -122,6 +166,8 @@ def main():
                 loss = l1_loss(pred, y)
 
             scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             scaler.step(optimizer)
             scaler.update()
 
@@ -161,14 +207,26 @@ def main():
 
             torch.save(model.state_dict(), f"{checkpoints_out}/best_model.pth")
 
-        # last checkpoint (every 10 epochs)
-        if epoch % 10 == 0:
-            torch.save(model.state_dict(), f"{checkpoints_out}/last_model.pth")
+        # last checkpoint (every epoch, full state for resuming after a kill)
+        torch.save(
+            {
+                "epoch": epoch,
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "scheduler": scheduler.state_dict(),
+                "scaler": scaler.state_dict(),
+                "best_val_loss": best_val_loss,
+                "train_loss_history": train_loss_history,
+                "val_loss_history": val_loss_history,
+                "cfg": cfg,
+                "run_date": run_date,
+                "run_starttime": run_starttime,
+            },
+            last_checkpoint_path,
+        )
 
         # log
-        with open(
-            f"{logs_out}/{dt.datetime.now().strftime('%H-%M-%S')}_train_log.txt", "a"
-        ) as f:
+        with open(log_path, "a") as f:
             f.write(f"{epoch},{avg_train_loss},{avg_val_loss}\n")
 
         # plot loss (every 10 epochs)
@@ -180,7 +238,7 @@ def main():
             plt.ylabel("Loss")
             plt.title("Train / Val Loss")
             plt.legend()
-            plt.savefig(f"{plots_out}/loss_curve.png")
+            plt.savefig(plot_path)
             plt.close()
 
 
