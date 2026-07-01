@@ -15,16 +15,23 @@ from monai.transforms import (
 
 from unet import build_model
 from dataset import get_subject_features
+from train import load_config
 
 
-MODEL_PATH = Path(__file__).parent / "outputs/checkpoints/best_model.pth"
-PATCH_SIZE = (192, 192, 192)
+# MODEL_PATH = Path(__file__).parent / "100_epoch_run_outputs/checkpoints/best_model.pth"
+# PATCH_SIZE = (128, 128, 128)
+
+# MODEL_PATH = Path(__file__).parent / "outputs/checkpoints/best_model.pth"
+
+PATCH_SIZE = (128, 128, 128)
 SW_BATCH = 1 # You can increase this if to speed up inference at the cost of VRAM
 OVERLAP = 0.5
 
 
 def predict(features_dir, out_path):
-
+    cfg = load_config()
+    out= cfg["output_dir"]
+    model_path = f"{out}/checkpoints/best_model.pth"
     transforms = Compose(
         [
             LoadImaged(
@@ -50,7 +57,7 @@ def predict(features_dir, out_path):
     device = "cuda"
 
     model = build_model().to(device)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device, weights_only=True))
+    model.load_state_dict(torch.load(model_path, map_location=device, weights_only=True))
     model.eval()
 
     subject = get_subject_features(features_dir)
