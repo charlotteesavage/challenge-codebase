@@ -30,7 +30,7 @@ def main():
 
     all_data = get_dataset(cfg["data_dir"])
     val_data, train_data = all_data[:2], all_data[2:]
-
+    
     train_transforms = get_transforms(cfg["patch_size"], cfg["train_num_samples"])
     val_transforms = get_transforms(cfg["patch_size"], cfg["val_num_samples"])
 

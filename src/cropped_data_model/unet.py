@@ -147,6 +147,6 @@ class UNet3D(nn.Module):
 def build_model():
 
     return UNet3D(
-        in_channels=1,  # only NAC-PET as input
+        in_channels=3,
         out_channels=1
     )

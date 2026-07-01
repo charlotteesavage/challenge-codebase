@@ -6,7 +6,9 @@ readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
     "datetime>=6.0",
+    "monai>=1.6.0",
     "nibabel>=5.3.3",
+    "simpleitk>=2.5.5",
     "tqdm>=4.67.3",
 ]
 
