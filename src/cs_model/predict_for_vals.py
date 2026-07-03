@@ -17,6 +17,7 @@ from monai.transforms import (
 from unet import build_model
 from dataset import get_subject_features
 from train import load_config
+from transforms import TileTopogramd
 
 VAL_DIR = "/SAN/medic/BIC-MAC-CS/bic-mac-data/val"
 PATCH_SIZE = (128, 128, 128)
@@ -31,19 +32,20 @@ def predict():
     transforms = Compose(
         [
             LoadImaged(
-                keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"]
+                keys=["nacpet", "topogram", "mri_combined_in_phase", "mri_combined_out_phase", "mri_face_mask"]
             ),
             EnsureChannelFirstd(
-                keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"]
+                keys=["nacpet", "topogram", "mri_combined_in_phase", "mri_combined_out_phase", "mri_face_mask"]
             ),
+            TileTopogramd(keys=["topogram"]),
             NormalizeIntensityd(
-                keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"],
+                keys=["nacpet", "topogram", "mri_combined_in_phase", "mri_combined_out_phase", "mri_face_mask"],
                 nonzero=True,
                 channel_wise=True,
                 subtrahend=[0],
             ),
             ConcatItemsd(
-                keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"],
+                keys=["nacpet", "topogram", "mri_combined_in_phase", "mri_combined_out_phase", "mri_face_mask"],
                 name="input",
             ),
             EnsureTyped(keys=["input"]),

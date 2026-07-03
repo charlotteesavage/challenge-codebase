@@ -145,6 +145,6 @@ class UNet3D(nn.Module):
 def build_model():
 
     return UNet3D(
-        in_channels=3,  # NAC-PET + mri_in_phase + mri_out_phase
+        in_channels=5,  # NAC-PET + topogram + mri_in_phase + mri_out_phase + mri face mask
         out_channels=1,
     )

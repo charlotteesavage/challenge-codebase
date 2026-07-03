@@ -18,7 +18,8 @@ torch.backends.cudnn.benchmark = True
 
 
 def load_config():
-    with open("config.yaml") as f:
+    # with open("config.yaml") as f:
+    with open("config_all_features.yaml") as f:
         return yaml.safe_load(f)
 
 
@@ -41,7 +42,7 @@ def main():
 
     all_data = get_dataset(cfg["data_dir"])
     random.Random(cfg["seed"]).shuffle(all_data)
-    val_data, train_data = all_data[:2], all_data[2:]
+    val_data, train_data = all_data[:3], all_data[3:]
 
     train_transforms = get_transforms(cfg["patch_size"], cfg["train_num_samples"])
     val_transforms = get_transforms(cfg["patch_size"], cfg["val_num_samples"])

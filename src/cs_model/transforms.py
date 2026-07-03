@@ -6,6 +6,19 @@ from monai.transforms import *
 # under the /features folder
 
 
+class TileTopogramd(MapTransform):
+    """Topogram is a 2D frontal projection (X, 1, Z); tile it along the missing
+    coronal axis to match the other 3D volumes so it can be concatenated as
+    another input channel."""
+
+    def __call__(self, data):
+        d = dict(data)
+        target_y = d["nacpet"].shape[2]  # channel-first: (C, X, Y, Z)
+        for key in self.key_iterator(d):
+            d[key] = d[key].repeat(1, 1, target_y, 1)
+        return d
+
+
 def get_transforms(patch_size, num_samples=2):
 
     transforms = Compose(
@@ -13,8 +26,10 @@ def get_transforms(patch_size, num_samples=2):
             LoadImaged(
                 keys=[
                     "nacpet",
+                    "topogram",
                     "mri_combined_in_phase",
                     "mri_combined_out_phase",
+                    "mri_face_mask",
                     "ct",
                     "prediction_mask",
                 ]
@@ -22,14 +37,17 @@ def get_transforms(patch_size, num_samples=2):
             EnsureChannelFirstd(
                 keys=[
                     "nacpet",
+                    "topogram",
                     "mri_combined_in_phase",
                     "mri_combined_out_phase",
+                    "mri_face_mask",
                     "ct",
                     "prediction_mask",
                 ]
             ),
+            TileTopogramd(keys=["topogram"]),
             NormalizeIntensityd(
-                keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"],
+                keys=["nacpet", "topogram", "mri_combined_in_phase", "mri_combined_out_phase", "mri_face_mask"],
                 nonzero=True,
                 channel_wise=True,
                 subtrahend=[0],
@@ -43,10 +61,10 @@ def get_transforms(patch_size, num_samples=2):
                 clip=True,
             ),
             ConcatItemsd(
-                keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"],
+                keys=["nacpet", "topogram", "mri_combined_in_phase", "mri_combined_out_phase", "mri_face_mask"],
                 name="input",
             ),
-            DeleteItemsd(keys=["nacpet", "mri_combined_in_phase", "mri_combined_out_phase"]),
+            DeleteItemsd(keys=["nacpet", "topogram", "mri_combined_in_phase", "mri_combined_out_phase", "mri_face_mask"]),
             # Crop first so all random augmentations run on small patches
             RandSpatialCropSamplesd(
                 keys=["input", "ct", "prediction_mask"],
