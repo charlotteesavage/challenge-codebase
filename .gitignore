@@ -8,6 +8,7 @@ docs_scripts/
 data/
 *.png
 src/cs_model/predictions
+*.DS_store
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python
 
