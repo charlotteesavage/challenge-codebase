@@ -6,6 +6,8 @@ outputs*/
 docs_scripts/
 *.nii.gz
 data/
+*.png
+src/cs_model/predictions
 # Created by https://www.toptal.com/developers/gitignore/api/visualstudiocode,python
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python
 
